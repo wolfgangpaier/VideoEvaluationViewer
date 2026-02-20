@@ -1,0 +1,44 @@
+*) Generate a system level specification MD file for a python tool that offers UI-based visual comparison and viewing of one or more videos.
+*) The tool should be implemented in the project subfolder ./visualization.
+*) Generate a concise specification document in the subfolder ./specifications/visualization.
+	1) mark all specifications that are directly based on this intial requirements document with [REQUIRED]
+	2) mark all specifications that can be unambiguously decduced from this requirements document with [DEDUCED]
+	3) mark all entries in the specification document the are unclear/ambiguous with [UNCLEAR]
+
+*) The main entry point for the script should be ./visualization/visualize.py
+*) Try to structure the code well and generate submodules within ./visualization where it's useful.
+
+*) Requirements for this tool are:
+	1) A simplistic UI. Videos should be loaded via drag-and-drop into the window or via the menu.
+		a) UI should have a menu with the following entries:
+			*) File->Load Videos: Opens a file-dialog that lets the user select 1 or more vieos which are added to the current viewing session.
+			*) View->Clear Videos: Unloads all opened videos.
+			*) Export: Opens a save file dialog where the user can choose the video-export path and trigger the export function.
+		b) The UI should have a scroll bar at the bottom of the window that lets the user choose the current video time. The scroll bar should be controlable by mouse and by left/right keys.
+		   Pushing the left/right key should update the video time to the next frame.
+		c) The UI-window should be resizable.
+		d) By default, videos are displaced side-by-side (1 row).
+	2) Viewed videos must have the same framerate, different resolutions should be handled by aspect-ration preserving resize.
+	3) Every videos is assigned a video ID starting at 0 for easy referencing.
+	3) The UI should have a status bar showing the current video time and frame number.
+	4) Every video should have a label, by default it's the video's filename with extension. The video label should be drawn in the top center of the video.
+	5) Right click on a video should open a video context menu.
+	6) The video context menu should have the following entries and functions:
+		a) Set caption: opens text-input window with the current label as default. The user can change the video's label.
+		b) Set filter: opens a filter configuration window that lets the user select a filter from a list of available filter. The filter window should have space on the right for configuration UI items, since every filter might have or have not configurable parameters.
+		c) Set playback audio: changes the source video ID for audio playback to the current video. This option should be inactive if the video has no audio track.
+	7) The tool should have a export function that exports the side-by-side view of all loaded videos
+		a) By default the output video should be exported in full-resolution i.e. all videos are upscaled to the maximum resolution of all input videos.
+		b) Alternatively, the user should be allowed to specify a specific export resolution where width and hight are automatically recomputed for aspect ration preservation.
+		c) Export would also draw the video frame number in the left top corner of the exported video.
+	8) CLI-Interaface: all user inputs (video-loading, filter, captioning, ...) as well as the export function should be configurable via CLI.
+	9) Visualization filter:
+		a) The tool should support filters for improved visualization. For now, we only need a difference heatmap that helps visualizing pixel differences between a video and a reference.
+		b) Reference videos, if necessary for a filter, should be selectable from a list in the filter's configuration window. The reference video list contains the video IDs following by ":" and the names of loaded videos.
+		c) The filter collection should be easily extendable for future needs.
+		
+	10) Audio: if one of the source videos has audio then it should be played together with the video and it should remain in sync with the video. Even with frame-by-frame scrolling audio-playback should work.
+		a) if multiple input videos have a audio track, then use the video with ID 0 by default as source. The source video ID for audio should be configurable via the right-click context menu.
+
+*) Non-functional requirements are:
+	1) Speed: scrolling through the video should be fast.
