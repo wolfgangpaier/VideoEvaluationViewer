@@ -6,13 +6,16 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QElapsedTimer, QPoint, QTimer, Qt
-from PySide6.QtGui import QAction, QKeyEvent
+from PySide6.QtGui import QAction, QKeyEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QComboBox,
+    QDockWidget,
     QDoubleSpinBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QMessageBox,
     QProgressDialog,
@@ -56,6 +59,8 @@ class MainWindow(QMainWindow):
         self._frame_cache = frame_cache or FrameCache()
         self._audio_player = audio_player or AudioPlayer()
         self._rows = rows
+        self._display_mode = "side_by_side"  # "side_by_side" | "single_view"
+        self._single_view_index = 0
         self._playing = False
         self._playback_speed = 1.0
         self._playback_start_time: float = 0.0
@@ -81,6 +86,22 @@ class MainWindow(QMainWindow):
         file_menu.addAction(load_action)
 
         view_menu = menu_bar.addMenu("View")
+        self._side_by_side_action = QAction("Side-by-Side", self)
+        self._side_by_side_action.setCheckable(True)
+        self._side_by_side_action.setChecked(True)
+        self._side_by_side_action.triggered.connect(
+            lambda: self._set_display_mode("side_by_side")
+        )
+        view_menu.addAction(self._side_by_side_action)
+
+        self._single_view_action = QAction("Single-View", self)
+        self._single_view_action.setCheckable(True)
+        self._single_view_action.triggered.connect(
+            lambda: self._set_display_mode("single_view")
+        )
+        view_menu.addAction(self._single_view_action)
+
+        view_menu.addSeparator()
         clear_action = QAction("Clear Videos", self)
         clear_action.triggered.connect(self._on_clear_videos)
         view_menu.addAction(clear_action)
@@ -138,6 +159,9 @@ class MainWindow(QMainWindow):
         layout.addLayout(transport)
         self.setCentralWidget(container)
 
+        self._setup_video_selector_dock()
+        self._setup_single_view_shortcuts()
+
     # ── Status bar ────────────────────────────────────────────────────
 
     def _setup_statusbar(self) -> None:
@@ -184,6 +208,12 @@ class MainWindow(QMainWindow):
         self._update_status(0)
         self._update_controls_state()
         self._setup_default_audio()
+
+        count = self._video_manager.video_count
+        self._single_view_index = min(self._single_view_index, max(0, count - 1))
+        self._canvas.set_single_view_index(self._single_view_index)
+        if self._display_mode == "single_view":
+            self._rebuild_video_selector_list()
 
     def _setup_default_audio(self) -> None:
         """Set audio source to video 0 if it has audio."""
@@ -390,6 +420,81 @@ class MainWindow(QMainWindow):
     def _set_rows(self, rows: int) -> None:
         self._rows = rows
         self._canvas.set_rows(rows)
+
+    # ── Display mode (Side-by-Side / Single-View) ──────────────────────
+
+    def _setup_video_selector_dock(self) -> None:
+        """Create dock widget with list for video selection in single-view mode."""
+        dock = QDockWidget("Video", self)
+        dock.setObjectName("VideoSelectorDock")
+        dock.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
+        )
+        self._video_list = QListWidget()
+        self._video_list.currentRowChanged.connect(self._on_video_list_selection_changed)
+        dock.setWidget(self._video_list)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, dock)
+        dock.hide()
+        self._video_selector_dock = dock
+
+    def _rebuild_video_selector_list(self) -> None:
+        """Rebuild list items for loaded videos."""
+        self._video_list.blockSignals(True)
+        self._video_list.clear()
+        videos = self._video_manager.get_all_videos()
+        for video in videos:
+            self._video_list.addItem(QListWidgetItem(video.label))
+
+        if videos:
+            self._single_view_index = min(self._single_view_index, len(videos) - 1)
+            self._video_list.setCurrentRow(self._single_view_index)
+            self._canvas.set_single_view_index(self._single_view_index)
+        self._video_list.blockSignals(False)
+
+    def _on_video_list_selection_changed(self, row: int) -> None:
+        if row >= 0:
+            self._single_view_index = row
+            self._canvas.set_single_view_index(row)
+
+    def _set_display_mode(self, mode: str) -> None:
+        self._display_mode = mode
+        self._side_by_side_action.setChecked(mode == "side_by_side")
+        self._single_view_action.setChecked(mode == "single_view")
+        self._canvas.set_display_mode(mode)
+
+        if mode == "single_view":
+            self._rebuild_video_selector_list()
+            self._video_selector_dock.show()
+            if self._video_manager.video_count > 0:
+                self._single_view_index = min(
+                    self._single_view_index, self._video_manager.video_count - 1
+                )
+                self._canvas.set_single_view_index(self._single_view_index)
+        else:
+            self._video_selector_dock.hide()
+
+    def _setup_single_view_shortcuts(self) -> None:
+        """Add Ctrl+0..Ctrl+9 shortcuts for switching videos in single-view mode."""
+        self._single_view_shortcuts: list[QShortcut] = []
+        for i in range(10):
+            shortcut = QShortcut(
+                QKeySequence(f"Ctrl+{i}"), self, context=Qt.ShortcutContext.ApplicationShortcut
+            )
+            shortcut.activated.connect(lambda idx=i: self._switch_to_video(idx))
+            self._single_view_shortcuts.append(shortcut)
+
+    def _switch_to_video(self, index: int) -> None:
+        """Switch to video at index (0-9) when in single-view mode."""
+        if self._display_mode != "single_view":
+            return
+        count = self._video_manager.video_count
+        if index < count:
+            self._single_view_index = index
+            self._canvas.set_single_view_index(index)
+            # Update list selection
+            self._video_list.blockSignals(True)
+            self._video_list.setCurrentRow(index)
+            self._video_list.blockSignals(False)
 
     # ── Status bar update ─────────────────────────────────────────────
 

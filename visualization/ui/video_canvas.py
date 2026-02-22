@@ -34,6 +34,8 @@ class VideoCanvas(QWidget):
         self._frame_cache = frame_cache
         self._current_frame: int = 0
         self._rows: int = 1
+        self._display_mode: str = "side_by_side"  # "side_by_side" | "single_view"
+        self._single_view_index: int = 0
 
         # ROI in normalised original-frame coordinates (x1, y1, x2, y2)
         self._roi: tuple[float, float, float, float] | None = None
@@ -60,6 +62,16 @@ class VideoCanvas(QWidget):
         self._rows = max(1, rows)
         self.update()
 
+    def set_display_mode(self, mode: str) -> None:
+        """Set display mode: 'side_by_side' or 'single_view'."""
+        self._display_mode = mode
+        self.update()
+
+    def set_single_view_index(self, index: int) -> None:
+        """Set which video is shown in single-view mode."""
+        self._single_view_index = max(0, index)
+        self.update()
+
     def reset_roi(self) -> None:
         """Clear the zoom region and show the full frame."""
         self._roi = None
@@ -78,6 +90,10 @@ class VideoCanvas(QWidget):
         videos = self._video_manager.get_all_videos()
         if video_index < 0 or video_index >= len(videos):
             return QRect()
+        if self._display_mode == "single_view":
+            if video_index == self._single_view_index:
+                return self.rect()
+            return QRect()
         count = len(videos)
         cols = self._grid_cols(count)
         w = self.width() // cols
@@ -89,6 +105,10 @@ class VideoCanvas(QWidget):
     def _panel_index_at(self, pos: QPoint) -> int | None:
         """Return the video-list index whose panel contains *pos*, or None."""
         videos = self._video_manager.get_all_videos()
+        if self._display_mode == "single_view":
+            if videos and self.rect().contains(pos):
+                return self._single_view_index
+            return None
         for idx in range(len(videos)):
             if self._get_panel_rect(idx).contains(pos):
                 return idx
@@ -156,12 +176,19 @@ class VideoCanvas(QWidget):
             return
 
         count = len(videos)
-        cols = self._grid_cols(count)
-        panel_w = self.width() // cols
-        panel_h = self.height() // self._rows
+        if self._display_mode == "single_view":
+            indices = [min(self._single_view_index, count - 1)]
+            panel_w = self.width()
+            panel_h = self.height()
+        else:
+            indices = range(count)
+            cols = self._grid_cols(count)
+            panel_w = self.width() // cols
+            panel_h = self.height() // self._rows
 
         painter = QPainter(self)
-        for idx, video in enumerate(videos):
+        for idx in indices:
+            video = videos[idx]
             rect = self._get_panel_rect(idx)
             if rect.isEmpty():
                 continue
