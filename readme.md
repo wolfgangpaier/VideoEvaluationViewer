@@ -1,6 +1,6 @@
 # Video Visualization & Comparison Tool
 
-Side-by-side video comparison with interactive scrubbing, per-video filters, ROI zoom, audio playback, and export.
+Video comparison with side-by-side or single-view display, interactive scrubbing, per-video filters, ROI zoom, audio playback, and export.
 
 ## Requirements
 
@@ -32,6 +32,13 @@ python -m visualization --videos ref.mp4 render.mp4 --export out.mp4 --no_gui
 - **File → Load Videos** opens a multi-file dialog.
 - **View → Clear Videos** removes all loaded videos.
 - All videos must share the same frame rate.
+
+### Display Modes
+
+- **View → Side-by-Side** (default): Shows all loaded videos in a grid. Use **View → Set Rows** to control the layout (1 row = horizontal strip, 2 rows = 2×2 grid, etc.).
+- **View → Single-View**: Shows one video at a time for closer inspection. A dock with a video list appears on the left:
+  - **Click** or **Up/Down arrow keys** (when the list has focus) to switch between videos.
+  - **Ctrl+0** … **Ctrl+9** switch to videos 0–9 respectively.
 
 ### Navigation & Playback
 
